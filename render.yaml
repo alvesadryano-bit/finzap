@@ -1,0 +1,26 @@
+# Render Blueprint — FinZap
+# As variáveis SENSÍVEIS (SUPABASE_SERVICE_KEY etc.) NÃO vão aqui;
+# eu as configuro via API/depois no painel como secrets.
+services:
+  - type: web
+    name: finzap
+    runtime: node
+    plan: free
+    region: ohio          # perto do us-east-2 do Supabase
+    buildCommand: npm ci --include=dev
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - key: WHATSAPP_MODE
+        value: baileys
+      - key: AI_PROVIDER
+        value: mock
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      # segredos (preencher no painel ou via API):
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false

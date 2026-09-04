@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#075e54">
+<title>FinZap — conectar WhatsApp</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:#0b141a;color:#e9edef;display:grid;place-items:center;padding:24px}
+  .cartao{background:#1f2c34;border-radius:18px;padding:28px;max-width:560px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.4)}
+  h1{margin:0 0 6px;font-size:21px}
+  .sub{color:#8696a0;font-size:13.5px;line-height:1.6;margin:0 0 20px}
+  .estado{display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:16px}
+  .bola{width:10px;height:10px;border-radius:50%;background:#8696a0;flex:none}
+  .bola.qr{background:#ffc107;animation:pisca 1.2s infinite}
+  .bola.on{background:#25d366}
+  .bola.err{background:#e5484d}
+  @keyframes pisca{50%{opacity:.35}}
+  .qrbox{background:#fff;border-radius:14px;padding:14px;display:grid;place-items:center;min-height:348px;margin-bottom:16px}
+  .qrbox img{width:320px;height:320px;display:block;image-rendering:pixelated}
+  .qrbox .espera{color:#111b21;font-size:14px;text-align:center;padding:40px 10px}
+  .girar{width:34px;height:34px;border:3px solid #d1d7db;border-top-color:#075e54;border-radius:50%;animation:gira .8s linear infinite;margin:0 auto 14px}
+  @keyframes gira{to{transform:rotate(360deg)}}
+  ol{padding-left:20px;margin:0 0 18px;font-size:14px;line-height:1.9;color:#d1d7db}
+  ol b{color:#fff}
+  .ok{background:#0f2f22;border:1px solid #25d366;border-radius:12px;padding:14px;font-size:14px;line-height:1.7;margin-bottom:16px}
+  .erro{background:#2f1618;border:1px solid #e5484d;border-radius:12px;padding:12px;font-size:13.5px;margin-bottom:16px}
+  .aviso{background:#2f2716;border:1px solid #ffc107;border-radius:12px;padding:12px;font-size:12.5px;line-height:1.65;color:#f0d98c;margin-bottom:16px}
+  .botoes{display:flex;gap:10px;flex-wrap:wrap}
+  button{border:0;border-radius:10px;padding:11px 18px;font-size:14px;cursor:pointer;font-weight:600}
+  .primario{background:#25d366;color:#062d1c}
+  .sec{background:#2a3942;color:#e9edef}
+  a{color:#53bdeb}
+  .dica{font-size:12.5px;color:#8696a0;margin-top:14px;line-height:1.6}
+  code{background:#111b21;padding:2px 6px;border-radius:5px;font-size:12px;color:#a6f0c6}
+</style>
+</head>
+<body>
+<div class="cartao">
+  <h1>🔗 Conectar o FinZap ao WhatsApp</h1>
+  <p class="sub">Escaneie o código com o WhatsApp do celular. Leva uns 10 segundos.</p>
+
+  <div class="estado"><span class="bola" id="bola"></span><span id="rotulo">carregando…</span></div>
+
+  <div class="qrbox" id="qrbox"><div class="espera"><div class="girar"></div>Aguardando o servidor…</div></div>
+
+  <div id="ok" class="ok" style="display:none"></div>
+  <div id="erro" class="erro" style="display:none"></div>
+
+  <div class="aviso">
+    ⚠️ <b>Leia antes:</b> o Baileys é um cliente não oficial do WhatsApp. Existe risco real de
+    banimento do número. Use um número que você pode perder, ou migre para a API oficial quando
+    for para uso sério.
+  </div>
+
+  <ol id="passos">
+    <li>Abra o <b>WhatsApp</b> no celular</li>
+    <li>Toque em <b>Configurações</b> (Android: ⋮ no canto) → <b>Aparelhos conectados</b></li>
+    <li>Toque em <b>Conectar um aparelho</b></li>
+    <li>Aponte a câmera para o código acima</li>
+  </ol>
+
+  <div class="botoes">
+    <a href="/" style="text-decoration:none"><button class="sec">← Abrir o painel</button></a>
+    <button class="sec" id="btnNovo">Gerar novo QR</button>
+    <button class="sec" id="btnSair">Desconectar</button>
+  </div>
+
+  <p class="dica" id="dica"></p>
+</div>
+
+<script>
+const $ = (s)=>document.querySelector(s);
+const BOLA = {parado:'',iniciando:'',qr:'qr',conectando:'',conectado:'on',desconectado:'err',erro:'err'};
+const ROTULO = {
+  parado:'Conector desligado',
+  iniciando:'Iniciando conexão…',
+  qr:'Escaneie o código',
+  conectando:'Autenticando…',
+  conectado:'Conectado',
+  desconectado:'Desconectado',
+  erro:'Erro',
+};
+
+async function atualizar(){
+  try{
+    const r = await fetch('/api/parear');
+    const p = await r.json();
+
+    $('#bola').className = 'bola ' + (BOLA[p.status]||'');
+    $('#rotulo').textContent = ROTULO[p.status] || p.status;
+
+    const box = $('#qrbox');
+    if(p.qr && p.status==='qr'){
+      box.innerHTML = `<img src="${p.qr}" alt="QR Code do WhatsApp">`;
+    } else if(p.status==='conectado'){
+      box.innerHTML = `<div class="espera" style="font-size:52px">✅</div>`;
+    } else {
+      box.innerHTML = `<div class="espera"><div class="girar"></div>${ROTULO[p.status]||'…'}</div>`;
+    }
+
+    if(p.status==='conectado' && p.usuario){
+      $('#ok').style.display='block';
+      $('#ok').innerHTML = `Conectado como <b>${p.usuario.nome}</b> · número <b>${p.usuario.numero||'—'}</b><br>
+        Modo: <b>${p.modoChat==='consigo-mesmo' ? 'conversa com você mesmo' : 'responde só um contato'}</b>`;
+      $('#passos').style.display='none';
+      $('#dica').innerHTML = p.modoChat==='consigo-mesmo'
+        ? `Agora abra o WhatsApp, busque o <b>seu próprio nome</b> na lista de conversas (o chat "Você") e mande <code>gastei 20 no mercado</code>. O FinZap responde ali.`
+        : `Mande uma mensagem do número autorizado para o número conectado. Ex.: <code>gastei 20 no mercado</code>.`;
+    } else {
+      $('#ok').style.display='none';
+      $('#passos').style.display='block';
+      $('#dica').textContent='';
+    }
+
+    $('#erro').style.display = p.erro ? 'block' : 'none';
+    if(p.erro) $('#erro').textContent = p.erro;
+  }catch(e){
+    $('#rotulo').textContent = 'Sem conexão com o servidor';
+    $('#bola').className='bola err';
+  }
+}
+
+$('#btnNovo').addEventListener('click', async ()=>{
+  await fetch('/api/parear/reiniciar',{method:'POST'});
+  atualizar();
+});
+$('#btnSair').addEventListener('click', async ()=>{
+  await fetch('/api/parear/sair',{method:'POST'});
+  atualizar();
+});
+
+atualizar();
+setInterval(atualizar, 2000);
+</script>
+</body>
+</html>
